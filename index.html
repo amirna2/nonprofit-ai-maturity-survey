@@ -12,7 +12,7 @@ const SECTIONS = [
 const SCORED = SECTIONS.flatMap(s=>s.ids);
 const LEVELS = ['Early','Developing','Established','Advanced'];
 const STAGES = ['No use','Informal use','Piloting','Integrated use'];
-const GATES = [4,5,7,10,14,17];
+const PRIORITY_PRACTICES = [4,5,7,10,14,17];
 const LABELS = {4:'AI strategy',5:'Responsible-use rules',6:'Leadership involvement',7:'Accountability',8:'Data quality',10:'Security',11:'Staff skills',12:'Learning',13:'Supported trials',14:'Output checking',17:'Operational measurement',18:'Mission outcomes'};
 const NEXT = {
   4:['Agree which organizational needs AI could help address.','Set out a practical plan with priorities, owners, and milestones.','Review the plan using results and changing priorities.'],
@@ -49,11 +49,7 @@ function validate(answers,questions){
 function classify(scores){
   const means=SECTIONS.map(s=>mean(s.ids.map(id=>scores[id])));
   const overall=mean(means); const candidate=band(overall);
-  let level=candidate;
-  const established=means.every(n=>n>=2.5) && GATES.every(id=>scores[id]>=3);
-  const advanced=established && means.every(n=>n>=3.25) && scores[18]===4;
-  while(level>1 && !(level===2?true:level===3?established:advanced))level--;
-  return {level,candidate,overall,means};
+  return {level:candidate,candidate,overall,means};
 }
 function assess(answers,questions){
   validate(answers,questions);
@@ -79,32 +75,19 @@ function assess(answers,questions){
   const complete=SCORED.every(id=>scores[id]!==null); const calc=complete?classify(scores):null;
   const reasons=[];
   const comparisons=[];
-  let adoptionNeedsReview=false;
   if(calc){
     reasons.push(`Your assessed maturity is ${LEVELS[calc.level-1]}, based on the practices described in the scored questions. Each of the four sections has equal weight.`);
     const weakest=sections.reduce((a,b)=>a.score<=b.score?a:b);
     if(weakest.score<3)reasons.push(`${weakest.name} is the lowest-scoring section (${weakest.score.toFixed(1)} / 4).`);
-    if(calc.level<3){
-      const unmet=GATES.filter(id=>scores[id]<3);
-      if(unmet.length)reasons.push(`To reach Established, strengthen these required practices: ${unmet.map(id=>LABELS[id].toLowerCase()).join(', ')}.`);
-      const weak=sections.filter(s=>s.score<2.5);
-      if(weak.length)reasons.push(`Established also requires each section to reach 2.5 / 4. Below that threshold: ${weak.map(s=>s.name).join(', ')}.`);
-    }
-    if(calc.level===3){
-      if(scores[18]<4)reasons.push('Advanced requires repeated evidence of mission benefit as appropriate use expands.');
-      if(sections.some(s=>s.score<3.25))reasons.push('Advanced also requires every section to reach 3.25 / 4.');
-    }
-    if(calc.level===4)reasons.push('You report reviewed practices and repeated evidence of mission benefits. Confirm the supporting examples in the follow-up conversation.');
     if(stage===2 && calc.level>=2)comparisons.push(`You described your AI use as informal. Your scored answers indicate ${LEVELS[calc.level-1]} practices. Discuss whether those practices are shared ways of working or individual habits.`);
-    if(stage===3 && calc.level>=3)comparisons.push(`You described piloting, while your scored practices reach ${LEVELS[calc.level-1]}. This may reflect a well-supported pilot. Confirm whether any use has become routine before finalizing the adoption assessment.`);
+    if(stage===3 && calc.level>=3)comparisons.push(`You described piloting, while your scored practices reach ${LEVELS[calc.level-1]}. A pilot can have well-established supporting practices. Use the gaps below to guide improvements before expanding use.`);
     if(stage===4){
-      const gaps=GATES.filter(id=>scores[id]<3);
+      const gaps=PRIORITY_PRACTICES.filter(id=>scores[id]<3);
       if(gaps.length)comparisons.push(`You described integrated use, with weaker practices in ${gaps.map(id=>LABELS[id].toLowerCase()).join(', ')}. Clarify how the regular workflow operates and which responsibilities and checks are agreed.`);
     }
     if(stage===1 && calc.level>=2)comparisons.push(`You reported no current AI use. Your other answers indicate ${LEVELS[calc.level-1]} foundations. Clarify whether they describe preparation or actual use.`);
-    adoptionNeedsReview=stage!==null&&((stage===1&&calc.level>=2)||(stage<4&&calc.level>=3));
   }else reasons.push('Some practices are not yet confirmed. The range shows the possible levels under the current scoring rules; it is not a confidence interval.');
-  const tier=id=>[5,7,10,14].includes(id)&&scores[id]<3?0:(GATES.includes(id)&&scores[id]<3)||(calc?.level>=3&&id===18&&scores[id]<4)?1:2;
+  const tier=id=>[5,7,10,14].includes(id)&&scores[id]<3?0:(PRIORITY_PRACTICES.includes(id)&&scores[id]<3)||(id===18&&scores[id]===3)?1:2;
   const gaps=SCORED.filter(id=>scores[id]!==null&&scores[id]<4).sort((a,b)=>tier(a)-tier(b)||scores[a]-scores[b]||a-b);
   const actions=gaps.slice(0,3).map(id=>({id,text:NEXT[id][scores[id]-1]}));
   const follow=[];
@@ -117,7 +100,7 @@ function assess(answers,questions){
   if(stage===4&&scores[18]===4)follow.push({id:18,text:FOLLOW[18]});
   const barrier=Number.isInteger(answers[19])?questions.find(q=>q.id===19).options[answers[19]-1]:null;
   const barrierAdvice={1:'Choose actions that can be supported with existing tools and a clearly bounded budget.',2:'Start with support for the specific tasks staff need to perform.',3:'Give the highest-priority action a clear owner and a realistic time allocation.',4:'Resolve the information needed for one relevant use before broadening adoption.',5:'Clarify the information involved and the required safeguards before expanding use.',6:'Identify a concrete organizational need before selecting a tool.',7:'Discuss the specific concerns behind leadership’s position before proposing a trial.'};
-  return {scores,stage,stageLabel:stage?STAGES[stage-1]:'Not confirmed',missing,contradictions,sections,range,level:calc?.level??null,candidate:calc?.candidate??null,overall:calc?.overall??null,provisional:missing.length>0||contradictions.length>0||adoptionNeedsReview,reasons,comparisons,actions,follow:follow.filter((f,i,a)=>a.findIndex(x=>x.id===f.id)===i).slice(0,3),barrier,barrierAdvice:barrierAdvice[answers[19]]??null};
+  return {scores,stage,stageLabel:stage?STAGES[stage-1]:'Not confirmed',missing,contradictions,sections,range,level:calc?.level??null,candidate:calc?.candidate??null,overall:calc?.overall??null,provisional:missing.length>0||contradictions.length>0,reasons,comparisons,actions,follow:follow.filter((f,i,a)=>a.findIndex(x=>x.id===f.id)===i).slice(0,3),barrier,barrierAdvice:barrierAdvice[answers[19]]??null};
 }
 
 const GROUPS=[{name:'About your organization',ids:[1,2,3]},{name:'Strategy and Governance',ids:[4,5,6,7]},{name:'Data and Infrastructure',ids:[8,9,10]},{name:'Culture and Literacy',ids:[11,12,13,14]},{name:'Application and Impact',ids:[15,16,17,18,19]}];
