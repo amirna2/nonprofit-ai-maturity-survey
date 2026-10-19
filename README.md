@@ -68,3 +68,7 @@ Browsers without that API ignore this and the page works as a normal form.
 ## Status
 
 This is a pilot framework. The levels describe the maturity of the practices a respondent reports. They are not a benchmark against other nonprofits and have not been validated as one. Treat the result as a starting point for a conversation, not a verdict.
+
+## License
+
+This work is licensed under the [Creative Commons Attribution 4.0 International License](LICENSE) (CC BY 4.0). You may share and adapt it, including commercially, as long as you give appropriate credit.
